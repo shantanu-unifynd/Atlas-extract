@@ -1,0 +1,16 @@
+# Keep the image to the service only — no tests, fixtures, dev renders, or
+# local virtualenv/git metadata.
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+tests
+out-*
+*.png
+render_verify.py
+README.md
+Dockerfile
+.dockerignore
