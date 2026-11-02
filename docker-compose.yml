@@ -1,0 +1,24 @@
+# Atlas Extract — one-command run of the extraction service.
+#
+#   docker compose up        # build (first time) + start, foreground
+#   docker compose up -d      # same, detached
+#   docker compose down       # stop + remove
+#
+# The Node backend reaches this service via EXTRACT_URL. When the backend
+# also runs in Docker on the same compose network, point it at the service
+# name: EXTRACT_URL=http://extract:5600. From the host it stays
+# http://localhost:5600 (the published port below).
+services:
+  extract:
+    build: .
+    image: atlas-extract:0.1
+    ports:
+      - "5600:5600"
+    restart: unless-stopped
+    healthcheck:
+      # slim has Python but not curl — probe /health with urllib.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5600/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
