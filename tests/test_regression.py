@@ -63,3 +63,20 @@ def test_phoenix_stroke_mode_wins_and_names_units():
     assert r["rooms"] >= 120
     assert r["rooms_named"] >= 90
     assert r["graph_components"] == 1
+
+
+def test_wtc_verification_report(wtc):
+    v = wtc["report"]["verification"]
+    assert set(v) >= {"rooms_low_confidence", "graph_components", "flags", "has_metric_scale"}
+    assert v["has_metric_scale"] is False            # no scale bar → flagged
+    assert isinstance(wtc["flags"], list) and len(wtc["flags"]) >= 1
+    # every flag carries a kind + reason the admin can act on
+    assert all({"kind", "reason"} <= set(f) for f in wtc["flags"])
+    # a no-scale flag is always present until scale detection lands
+    assert any(f["kind"] == "scale" for f in wtc["flags"])
+
+
+def test_wtc_rooms_carry_confidence(wtc):
+    rooms = wtc["atlas"]["rooms"]
+    assert all("confidence" in r for r in rooms if r.get("polygon"))
+    assert all(0.0 <= r["confidence"] <= 1.0 for r in rooms if "confidence" in r)

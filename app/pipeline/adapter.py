@@ -5,7 +5,9 @@ units so they overlay the original plan 1:1."""
 import itertools
 
 
-def to_atlas(seg, names, categories, G, entries, corridor_labels, scale, size):
+def to_atlas(seg, names, categories, G, entries, corridor_labels, scale, size,
+             room_conf=None):
+    room_conf = room_conf or {}
     inv = 1.0 / scale
     rooms, labels = [], []
     for cid, poly in seg.room_polys.items():
@@ -14,6 +16,7 @@ def to_atlas(seg, names, categories, G, entries, corridor_labels, scale, size):
             "id": rid,
             "name": names.get(cid),
             "category": f"legend-{categories[cid]}" if cid in categories else None,
+            "confidence": room_conf.get(cid, 1.0),
             "polygon": [{"x": round(float(x) * inv, 2), "y": round(float(y) * inv, 2)}
                         for x, y in poly],
         })

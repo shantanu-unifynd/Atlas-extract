@@ -88,6 +88,11 @@ def extract(path: str) -> dict:
 
     G, entries = build_graph(seg.corridor, seg.room_polys)
 
+    from .confidence import build_verification
+    # No scale-bar detection yet — always flagged for the admin to set once.
+    room_conf, flags, verification = build_verification(
+        seg, names, G, entries, ing.scale, has_scale_bar=False)
+
     import networkx as nx
     report = {
         "input": path.split("/")[-1],
@@ -104,6 +109,8 @@ def extract(path: str) -> dict:
         "graph_edges": G.number_of_edges(),
         "graph_components": nx.number_connected_components(G),
         "legend_categories": len(seg.legend),
+        "verification": verification,
     }
-    atlas = to_atlas(seg, names, categories, G, entries, corridor_labels, ing.scale, (W, H))
-    return {"report": report, "atlas": atlas}
+    atlas = to_atlas(seg, names, categories, G, entries, corridor_labels,
+                     ing.scale, (W, H), room_conf)
+    return {"report": report, "flags": flags, "atlas": atlas}
