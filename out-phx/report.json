@@ -1,0 +1,19 @@
+{
+ "input": "0001.svg",
+ "mode": "stroke",
+ "calibration": {
+  "ink_threshold": 190,
+  "close_kernel": 9
+ },
+ "labels_total": 686,
+ "labels_source": "vector",
+ "rooms": 141,
+ "rooms_named": 108,
+ "rooms_categorized": 0,
+ "labels_in_corridor": 0,
+ "labels_junk": 178,
+ "graph_nodes": 222,
+ "graph_edges": 253,
+ "graph_components": 1,
+ "legend_categories": 0
+}

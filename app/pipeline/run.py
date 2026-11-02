@@ -35,8 +35,6 @@ def extract(path: str) -> dict:
     ing = ingest(path)
     H, W = ing.raster.shape[:2]
 
-    mode = S.choose_mode(ing.raster_notext)
-
     # vector labels first (free + exact); OCR only when the file has none
     dets = []
     if ing.source_kind == "svg" and ing.svg_root is not None:
@@ -51,12 +49,31 @@ def extract(path: str) -> dict:
         used_ocr = True
 
     label_pts = [(int(d["x"]), int(d["y"])) for d in dets]
-    seg = S.segment_stroke(ing.raster_notext, label_pts) if mode == "stroke" \
-        else S.segment_color(ing.raster_notext)
-    if seg.corridor is None:
-        raise RuntimeError("no corridor region found")
 
-    per_room, corridor_labels, junk = _bind(seg, dets, W, H)
+    # Mode is chosen by evidence, not heuristics: run both segmenters, bind the
+    # labels with the SAME radius binding used downstream, and keep whichever
+    # yields more distinct labeled rooms (raw hit counts reward giant blobs —
+    # Phoenix; raw centre hits punish colour rooms with text holes — FF).
+    candidates = []
+    for builder in (lambda: S.segment_stroke(ing.raster_notext, label_pts),
+                    lambda: S.segment_color(ing.raster_notext)):
+        try:
+            sg = builder()
+        except Exception:
+            continue
+        if sg.corridor is None or not sg.room_polys:
+            continue
+        bound = _bind(sg, dets, W, H)
+        # A detected legend whose colours match many rooms is decisive evidence
+        # of the colour convention (FF). Absent a legend this term is 0 and the
+        # labeled-room count decides (Phoenix stroke vs colour).
+        categorized = sum(1 for cid in sg.room_polys if S.category_index(sg, cid) is not None)
+        score = (len(bound[0]) + categorized) * 1000 + len(sg.room_polys)
+        candidates.append((score, sg, bound))
+    if not candidates:
+        raise RuntimeError("no corridor region found")
+    _, seg, (per_room, corridor_labels, junk) = max(candidates, key=lambda t: t[0])
+    mode = seg.mode
 
     names, categories = {}, {}
     for cid in seg.room_polys:

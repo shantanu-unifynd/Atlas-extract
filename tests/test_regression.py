@@ -49,3 +49,17 @@ def test_ff_color_mode_and_ocr():
     assert r["rooms_named"] >= 60
     assert r["rooms_categorized"] >= 70
     assert r["graph_components"] == 1
+
+
+PHOENIX = pathlib.Path("/Users/unifynd-pro/Desktop/Atlas-Platform/assets/0001.svg")
+
+
+@pytest.mark.skipif(not PHOENIX.exists(), reason="Phoenix asset not present")
+def test_phoenix_stroke_mode_wins_and_names_units():
+    r = extract(str(PHOENIX))["report"]
+    # Mode selection must resist the status-tint fills (giant-blob trap).
+    assert r["mode"] == "stroke"
+    assert r["calibration"], "auto-calibration must report its chosen parameters"
+    assert r["rooms"] >= 120
+    assert r["rooms_named"] >= 90
+    assert r["graph_components"] == 1
