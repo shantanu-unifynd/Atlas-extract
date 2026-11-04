@@ -85,6 +85,30 @@ def svg_labels(root: ET.Element, scale: float) -> list[dict]:
     return uniq
 
 
+def pdf_labels(words: list, scale: float) -> list[dict]:
+    """[{text, x, y}] in raster pixels. PyMuPDF `get_text("words")` returns one
+    row per word tagged with its (block, line, word_no); regroup them into the
+    original text lines so a multi-word shop name ("SHOPPERS STOP") arrives as
+    one label instead of several fragments — mirroring how a whole SVG <text>
+    element arrives (otherwise room naming, which keeps the longest single
+    detection, would truncate names to their longest word)."""
+    lines = {}
+    for w in words:
+        if len(w) < 8 or not str(w[4]).strip():
+            continue
+        lines.setdefault((w[5], w[6]), []).append(w)
+    out = []
+    for members in lines.values():
+        members.sort(key=lambda m: m[7])  # word order within the line
+        text = re.sub(r"\s+", " ", " ".join(str(m[4]) for m in members)).strip()
+        if not text:
+            continue
+        x0 = min(m[0] for m in members); y0 = min(m[1] for m in members)
+        x1 = max(m[2] for m in members); y1 = max(m[3] for m in members)
+        out.append({"text": text, "x": (x0 + x1) / 2 * scale, "y": (y0 + y1) / 2 * scale})
+    return out
+
+
 def ocr_labels(raster: np.ndarray, min_conf: float = 0.5) -> list[dict]:
     """Whole-plan OCR plus two rotated passes for vertical names.
     Returns [{text, x, y, conf}] in raster pixels."""

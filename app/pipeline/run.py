@@ -40,9 +40,7 @@ def extract(path: str) -> dict:
     if ing.source_kind == "svg" and ing.svg_root is not None:
         dets = [dict(d, conf=1.0, rot=None) for d in L.svg_labels(ing.svg_root, ing.scale)]
     elif ing.pdf_words:
-        dets = [{"text": w[4], "x": (w[0] + w[2]) / 2 * ing.scale,
-                 "y": (w[1] + w[3]) / 2 * ing.scale, "conf": 1.0, "rot": None}
-                for w in ing.pdf_words]
+        dets = [dict(d, conf=1.0, rot=None) for d in L.pdf_labels(ing.pdf_words, ing.scale)]
     used_ocr = False
     if not dets:
         dets = L.ocr_labels(ing.raster)

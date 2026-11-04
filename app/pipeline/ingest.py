@@ -24,7 +24,7 @@ class IngestResult:
     scale: float                # raster px per source unit
     source_kind: str            # "svg" | "pdf"
     svg_root: ET.Element | None = None
-    pdf_words: list = field(default_factory=list)  # (x0,y0,x1,y1,word) in source units
+    pdf_words: list = field(default_factory=list)  # (x0,y0,x1,y1,word,block,line,word_no) source units
 
 
 def _render_svg(svg_bytes: bytes) -> np.ndarray:
@@ -65,6 +65,24 @@ def _prep_svg(root: ET.Element, width_px: int, strip_text: bool) -> bytes:
     return ET.tostring(clone)
 
 
+def _redact_pdf_text(raster: np.ndarray, words: list, zoom: float, pad: int = 2) -> np.ndarray:
+    """PDF counterpart to the SVG `strip_text` re-render: paint the page
+    background (white) over every word box so the CV segmenter sees walls only.
+    Boxes come straight from the PDF text layer (exact positions, not OCR), so
+    glyph strokes no longer feed the ink mask / corridor skeleton. No text layer
+    -> no boxes -> returns an unchanged copy (outline/scanned PDFs are OCR'd)."""
+    out = raster.copy()
+    H, W = out.shape[:2]
+    for w in words:
+        x0 = max(0, int(w[0] * zoom) - pad)
+        y0 = max(0, int(w[1] * zoom) - pad)
+        x1 = min(W, int(w[2] * zoom) + pad)
+        y1 = min(H, int(w[3] * zoom) + pad)
+        if x1 > x0 and y1 > y0:
+            out[y0:y1, x0:x1] = 255
+    return out
+
+
 def ingest(path: str) -> IngestResult:
     if path.lower().endswith(".svg"):
         ET.register_namespace("", SVG_NS)
@@ -80,9 +98,8 @@ def ingest(path: str) -> IngestResult:
         pix = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
         img = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, pix.n)
         raster = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        words = [tuple(wd[:5]) for wd in page.get_text("words")]
-        # No-text raster for PDFs with a real text layer is a later refinement
-        # (redaction render); plans with outline text are identical anyway.
-        return IngestResult(raster, raster.copy(), zoom, "pdf", pdf_words=words)
+        words = [tuple(wd[:8]) for wd in page.get_text("words")]
+        notext = _redact_pdf_text(raster, words, zoom)
+        return IngestResult(raster, notext, zoom, "pdf", pdf_words=words)
 
     raise ValueError(f"unsupported input: {path}")
