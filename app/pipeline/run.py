@@ -113,8 +113,18 @@ def extract(path: str) -> dict:
     for cid in seg.room_polys:
         room_dets = per_room.get(cid, [])
         if room_dets:
-            names[cid] = L.join_room_detections(room_dets) if used_ocr \
-                else max((d["text"] for d in room_dets), key=len)
+            if used_ocr:
+                names[cid] = L.join_room_detections(room_dets)
+            else:
+                # Prefer identity text over measurements: a unit number like
+                # "F-11" names the shop; "7115 SQ.FT." / bare numbers are
+                # dimensions and only used when nothing else bound.
+                texts = [d["text"] for d in room_dets]
+                import re
+                ident = [t for t in texts
+                         if not re.fullmatch(r"[\d.,\s]+", t)
+                         and not re.search(r"sq\.?\s*ft", t, re.I)]
+                names[cid] = max(ident or texts, key=len)
         if seg.mode == "color":
             k = S.category_index(seg, cid)
             if k is not None:
