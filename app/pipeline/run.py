@@ -120,7 +120,13 @@ def extract(path: str) -> dict:
             if k is not None:
                 categories[cid] = k
 
-    G, entries = build_graph(seg.corridor, seg.room_polys)
+    # Routing entries for classified SHOPS only — plan furniture (legend boxes,
+    # dimension notes, kind="other" cells) must not appear as destinations in
+    # the visitor picker nor pull the graph toward junk cells.
+    from .classify import shop_cids
+    shop_polys = {cid: seg.room_polys[cid]
+                  for cid in shop_cids(seg.room_polys, (H, W))}
+    G, entries = build_graph(seg.corridor, shop_polys or seg.room_polys)
 
     from .confidence import build_verification
     # No scale-bar detection yet — always flagged for the admin to set once.

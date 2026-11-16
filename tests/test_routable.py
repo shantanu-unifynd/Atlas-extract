@@ -43,10 +43,12 @@ def test_ff_routable_floor():
 @pytest.mark.slow
 @pytest.mark.skipif(not (ASSETS / "0001.svg").exists(), reason="asset not present")
 def test_palassio_svg_baselines():
-    # P2 shop-gap reader gains locked in (measured 2026-11-16: 80.8 / 86.3,
-    # both mode=shopgap). Floors sit just under the measured values.
-    assert measure(str(ASSETS / "0001.svg"))["pct"] >= 75.0
-    assert measure(str(ASSETS / "0002.svg"))["pct"] >= 80.0
+    # P2 shop-gap reader gains locked in; re-measured 2026-11-16 after the
+    # exterior-ring trim: 73.1 / 80.8 (was 80.8 / 86.3 — the delta is shops
+    # that were only "reachable" via the back-of-building loop, which produced
+    # wrong visitor routes and was removed deliberately).
+    assert measure(str(ASSETS / "0001.svg"))["pct"] >= 70.0
+    assert measure(str(ASSETS / "0002.svg"))["pct"] >= 78.0
 
 
 PALASSIO_PDF = ASSETS / "PHOENIX PALASSIO TRADING FLOOR PLAN - 23-01-26.pdf"

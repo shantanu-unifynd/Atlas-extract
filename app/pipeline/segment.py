@@ -190,8 +190,26 @@ def segment_shopgap(stroke_seg: Segmentation, shape_hw) -> Segmentation | None:
     for cid in shops:
         cv2.fillPoly(shopmask, [stroke_seg.room_polys[cid].astype(np.int32)], 1)
     foot_k = max(9, int(0.05 * W) | 1)
-    foot = cv2.dilate(shopmask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (foot_k, foot_k)))
-    free = ((foot > 0) & (cv2.dilate(shopmask, np.ones((5, 5), np.uint8)) == 0)).astype(np.uint8)
+    ell = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (foot_k, foot_k))
+    foot = cv2.dilate(shopmask, ell)
+    # Trim the exterior ring: the dilated footprint extends PAST the outer shop
+    # wall, so untreated free space loops around the building and routes go
+    # "behind" the shops. Interior = shop gaps closed inward (cannot extend
+    # past the outer wall). Free-space parts outside the interior are dropped
+    # ONLY when they connect to the outside of the footprint — wide interior
+    # concourses the closing missed are enclosed and stay.
+    int_k = 3 * foot_k + 1
+    interior = cv2.morphologyEx(
+        shopmask, cv2.MORPH_CLOSE,
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (int_k, int_k)))
+    free = ((foot > 0)
+            & (cv2.dilate(shopmask, np.ones((5, 5), np.uint8)) == 0)).astype(np.uint8)
+    ext = (free > 0) & (interior == 0)
+    n_e, lab_e = cv2.connectedComponents(ext.astype(np.uint8), connectivity=8)
+    outside = cv2.dilate((foot == 0).astype(np.uint8), np.ones((5, 5), np.uint8))
+    drop = set(np.unique(lab_e[(outside > 0) & (lab_e > 0)]))
+    if drop:
+        free[np.isin(lab_e, list(drop))] = 0
     free = cv2.morphologyEx(free, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
     free = _bridge_components(free, max_gap=int(0.015 * W))
     if not free.any():

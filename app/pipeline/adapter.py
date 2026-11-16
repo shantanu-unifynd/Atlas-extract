@@ -25,7 +25,9 @@ def to_atlas(seg, names, categories, G, entries, corridor_labels, scale, size,
                         for x, y in poly],
         })
         if cid in names:
-            cx, cy = entries[cid]["pos"]
+            # Non-shop rooms carry no routing entry; anchor their label at the
+            # polygon centre instead.
+            cx, cy = entries[cid]["pos"] if cid in entries else poly.mean(axis=0)
             labels.append({"id": f"label-{cid}", "text": names[cid], "roomId": rid,
                            "position": {"x": round(cx * inv, 2), "y": round(cy * inv, 2)}})
     for i, d in enumerate(corridor_labels):
