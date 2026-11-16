@@ -142,6 +142,68 @@ def segment_color(raster_notext: np.ndarray) -> Segmentation:
     return seg
 
 
+def _bridge_components(mask: np.ndarray, max_gap: int, width: int = 7, rounds: int = 6):
+    """Join disconnected mask pieces: repeatedly draw a line from each minor
+    component to the nearest main-component point when the gap is small
+    (<= max_gap px). Distant pieces stay separate — no fantasy hallways."""
+    from scipy.spatial import cKDTree
+    out = mask.copy()
+    for _ in range(rounds):
+        n, lab, stats, _ = cv2.connectedComponentsWithStats(out, connectivity=8)
+        if n <= 2:
+            break
+        main = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+        mys, mxs = np.where(lab == main)
+        tree = cKDTree(np.column_stack([mxs, mys])[::5])
+        bridged = False
+        for ci in range(1, n):
+            if ci == main:
+                continue
+            ys, xs = np.where(lab == ci)
+            pts = np.column_stack([xs, ys])[::5]
+            d, j = tree.query(pts)
+            k = int(np.argmin(d))
+            if d[k] > max_gap:
+                continue
+            mp = tree.data[j[k]].astype(int)
+            cv2.line(out, (int(pts[k][0]), int(pts[k][1])), (int(mp[0]), int(mp[1])),
+                     1, width)
+            bridged = True
+        if not bridged:
+            break
+    return out
+
+
+def segment_shopgap(stroke_seg: Segmentation, shape_hw) -> Segmentation | None:
+    """Reader 3 — the shop-gap walkway (atrium-mall class). The stroke
+    reader's CELLS are reliable even when its corridor pick is not: the empty
+    gaps BETWEEN classified shops ARE the hallways. Walkway = free space
+    within a tight footprint around the shops, minus the shops, with nearby
+    pieces auto-bridged. Rooms are reused from the stroke segmentation; only
+    the corridor differs. Returns None when too few shops to carve gaps."""
+    from .classify import shop_cids
+    H, W = shape_hw
+    shops = shop_cids(stroke_seg.room_polys, (H, W))
+    if len(shops) < 8:
+        return None
+    shopmask = np.zeros((H, W), np.uint8)
+    for cid in shops:
+        cv2.fillPoly(shopmask, [stroke_seg.room_polys[cid].astype(np.int32)], 1)
+    foot_k = max(9, int(0.05 * W) | 1)
+    foot = cv2.dilate(shopmask, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (foot_k, foot_k)))
+    free = ((foot > 0) & (cv2.dilate(shopmask, np.ones((5, 5), np.uint8)) == 0)).astype(np.uint8)
+    free = cv2.morphologyEx(free, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    free = _bridge_components(free, max_gap=int(0.015 * W))
+    if not free.any():
+        return None
+    seg = Segmentation("shopgap", stroke_seg.comp, list(stroke_seg.room_ids),
+                       stats=stroke_seg.stats, cents=stroke_seg.cents,
+                       calibration=dict(stroke_seg.calibration))
+    seg.room_polys = stroke_seg.room_polys
+    seg.corridor = free > 0
+    return seg
+
+
 def category_index(seg: Segmentation, cid: int, max_dist: float = 60.0):
     if not seg.legend or cid not in seg.room_color:
         return None

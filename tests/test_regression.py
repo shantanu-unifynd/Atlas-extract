@@ -57,8 +57,10 @@ PHOENIX = pathlib.Path("/Users/unifynd-pro/Desktop/Atlas-Platform/assets/0001.sv
 @pytest.mark.skipif(not PHOENIX.exists(), reason="Phoenix asset not present")
 def test_phoenix_stroke_mode_wins_and_names_units():
     r = extract(str(PHOENIX))["report"]
-    # Mode selection must resist the status-tint fills (giant-blob trap).
-    assert r["mode"] == "stroke"
+    # Mode selection must resist the status-tint fills (giant-blob trap):
+    # colour must NOT win. Since P2, the shop-gap reader (stroke cells, better
+    # hallway) may displace stroke by routable margin — both are correct.
+    assert r["mode"] in ("stroke", "shopgap")
     assert r["calibration"], "auto-calibration must report its chosen parameters"
     assert r["rooms"] >= 120
     assert r["rooms_named"] >= 90

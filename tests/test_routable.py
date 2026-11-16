@@ -43,10 +43,10 @@ def test_ff_routable_floor():
 @pytest.mark.slow
 @pytest.mark.skipif(not (ASSETS / "0001.svg").exists(), reason="asset not present")
 def test_palassio_svg_baselines():
-    # Documented LOW baselines — the problem Reader 3 (shop-gap walkway) must
-    # fix. Floors only guard against making the bad case worse.
-    assert measure(str(ASSETS / "0001.svg"))["pct"] >= 20.0
-    assert measure(str(ASSETS / "0002.svg"))["pct"] >= 25.0
+    # P2 shop-gap reader gains locked in (measured 2026-11-16: 80.8 / 86.3,
+    # both mode=shopgap). Floors sit just under the measured values.
+    assert measure(str(ASSETS / "0001.svg"))["pct"] >= 75.0
+    assert measure(str(ASSETS / "0002.svg"))["pct"] >= 80.0
 
 
 PALASSIO_PDF = ASSETS / "PHOENIX PALASSIO TRADING FLOOR PLAN - 23-01-26.pdf"
@@ -55,5 +55,6 @@ PALASSIO_PDF = ASSETS / "PHOENIX PALASSIO TRADING FLOOR PLAN - 23-01-26.pdf"
 @pytest.mark.slow
 @pytest.mark.skipif(not PALASSIO_PDF.exists(), reason="asset not present")
 def test_palassio_pdf_baseline():
+    # P2 measured 69.0 (mode=shopgap, 2 pieces main 92%).
     r = measure(str(PALASSIO_PDF))
-    assert r["pct"] >= 25.0, f"Palassio-PDF routable dropped below baseline: {r}"
+    assert r["pct"] >= 60.0, f"Palassio-PDF routable dropped below baseline: {r}"

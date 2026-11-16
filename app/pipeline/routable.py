@@ -26,11 +26,8 @@ import cv2
 import numpy as np
 from skimage.morphology import skeletonize
 
-from . import labels as L
-from . import segment as S
 from .classify import shop_cids
 from .ingest import ingest
-from .run import _bind
 
 NEAR_FRAC = 25.0 / 3600.0
 NEAR_MIN_PX = 25.0
@@ -38,36 +35,13 @@ BOUNDARY_STEP_PX = 10.0
 
 
 def winning_segmentation(path: str):
-    """Re-run the pipeline's own mode contest (mirrors run.extract's candidate
-    loop) and return the winning Segmentation. Duplicated here so measurement
-    needs no change to the pipeline itself; keep in sync with run.extract."""
+    """The pipeline's own contest winner — delegates to run.select_segmentation
+    (the single source of truth) so measurement can never drift from extract."""
+    from .run import detect_labels, select_segmentation
     ing = ingest(path)
-    H, W = ing.raster.shape[:2]
-    dets = []
-    if ing.source_kind == "svg" and ing.svg_root is not None:
-        dets = [dict(d, conf=1.0, rot=None) for d in L.svg_labels(ing.svg_root, ing.scale)]
-    elif ing.pdf_words:
-        dets = [dict(d, conf=1.0, rot=None) for d in L.pdf_labels(ing.pdf_words, ing.scale)]
-    if not dets:
-        dets = L.ocr_labels(ing.raster)
-    label_pts = [(int(d["x"]), int(d["y"])) for d in dets]
-
-    candidates = []
-    for builder in (lambda: S.segment_stroke(ing.raster_notext, label_pts),
-                    lambda: S.segment_color(ing.raster_notext)):
-        try:
-            sg = builder()
-        except Exception:
-            continue
-        if sg.corridor is None or not sg.room_polys:
-            continue
-        bound = _bind(sg, dets, W, H)
-        categorized = sum(1 for cid in sg.room_polys if S.category_index(sg, cid) is not None)
-        score = (len(bound[0]) + categorized) * 1000 + len(sg.room_polys)
-        candidates.append((score, sg))
-    if not candidates:
-        raise RuntimeError("no corridor region found")
-    return max(candidates, key=lambda t: t[0])[1]
+    dets, _ = detect_labels(ing)
+    seg, _ = select_segmentation(ing, dets)
+    return seg
 
 
 def corridor_main(corridor: np.ndarray):
