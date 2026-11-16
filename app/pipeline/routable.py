@@ -14,9 +14,9 @@ hallway network? A shop counts as routable iff
 Skeleton piece count / main share are still reported (fragmentation signal),
 but adjacency is judged against the connected mask.
 
-"Shops" are size-band rooms (0.06%..3% of image area) — excludes hairline
-slivers and giant voids so the metric compares the same population across
-plans. NEAR = max(25 px, 0.7% of image width): 25 px is the threshold the
+"Shops" come from classify.shop_cids (size band + isolation cut) so the
+metric and the pipeline agree on what a shop is.
+NEAR = max(25 px, 0.7% of image width): 25 px is the threshold the
 2026-11-05 cross-plan adj% study used at 3600 px width (WTC 94 / FF 100 /
 Palassio-SVG 31 / Palassio-PDF 7), kept so baselines stay comparable.
 """
@@ -28,11 +28,10 @@ from skimage.morphology import skeletonize
 
 from . import labels as L
 from . import segment as S
+from .classify import shop_cids
 from .ingest import ingest
 from .run import _bind
 
-SHOP_MIN_FRAC = 0.0006
-SHOP_MAX_FRAC = 0.03
 NEAR_FRAC = 25.0 / 3600.0
 NEAR_MIN_PX = 25.0
 BOUNDARY_STEP_PX = 10.0
@@ -130,14 +129,11 @@ def _boundary_points(poly, step=BOUNDARY_STEP_PX):
 def routable_stats(seg, shape_hw) -> dict:
     """The metric. seg = Segmentation (corridor + room_polys); shape_hw = (H, W)."""
     H, W = shape_hw
-    A = float(H * W)
     near = max(NEAR_MIN_PX, NEAR_FRAC * W)
 
-    shops = []
-    for cid, poly in seg.room_polys.items():
-        a = cv2.contourArea(poly.astype(np.float32))
-        if SHOP_MIN_FRAC * A <= a <= SHOP_MAX_FRAC * A:
-            shops.append({"cid": cid, "poly": poly, "bnd": _boundary_points(poly)})
+    keep = shop_cids(seg.room_polys, shape_hw)
+    shops = [{"cid": cid, "poly": seg.room_polys[cid],
+              "bnd": _boundary_points(seg.room_polys[cid])} for cid in sorted(keep)]
 
     out = {"mode": seg.mode, "shops": len(shops), "ok": 0, "far": 0, "cross": 0,
            "pct": 0.0, "pieces": 0, "main_frac": 0.0}
