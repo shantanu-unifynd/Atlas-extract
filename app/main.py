@@ -18,8 +18,8 @@ def health():
 @app.post("/extract")
 async def extract_plan(file: UploadFile):
     suffix = "." + (file.filename or "plan.svg").rsplit(".", 1)[-1].lower()
-    if suffix not in (".svg", ".pdf"):
-        raise HTTPException(422, "unsupported format — send SVG or PDF")
+    if suffix not in (".svg", ".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".webp"):
+        raise HTTPException(422, "unsupported format — send SVG, PDF or a raster image (JPG/PNG)")
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         shutil.copyfileobj(file.file, tmp)
         path = tmp.name
