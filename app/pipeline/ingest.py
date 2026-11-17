@@ -22,7 +22,7 @@ class IngestResult:
     raster: np.ndarray          # BGR, with text
     raster_notext: np.ndarray   # BGR, text stripped (SVG) or identical (no text layer)
     scale: float                # raster px per source unit
-    source_kind: str            # "svg" | "pdf"
+    source_kind: str            # "svg" | "pdf" | "image"
     svg_root: ET.Element | None = None
     pdf_words: list = field(default_factory=list)  # (x0,y0,x1,y1,word,block,line,word_no) source units
 
@@ -101,5 +101,18 @@ def ingest(path: str) -> IngestResult:
         words = [tuple(wd[:8]) for wd in page.get_text("words")]
         notext = _redact_pdf_text(raster, words, zoom)
         return IngestResult(raster, notext, zoom, "pdf", pdf_words=words)
+
+    if path.lower().endswith((".jpg", ".jpeg", ".png", ".bmp", ".webp")):
+        img = cv2.imread(path, cv2.IMREAD_COLOR)
+        if img is None:
+            raise ValueError(f"unreadable image: {path}")
+        h, w = img.shape[:2]
+        zoom = TARGET_WIDTH / w
+        raster = cv2.resize(img, (TARGET_WIDTH, int(h * zoom)),
+                            interpolation=cv2.INTER_CUBIC if zoom > 1 else cv2.INTER_AREA)
+        # No text layer exists in a plain image — raster_notext stays identical
+        # and labels fall back to OCR (run.extract already does this when no
+        # vector words are found).
+        return IngestResult(raster, raster.copy(), zoom, "image")
 
     raise ValueError(f"unsupported input: {path}")
